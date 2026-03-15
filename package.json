@@ -1,0 +1,12 @@
+{
+  "name": "youtube-playlists",
+  "version": "1.0.0",
+  "description": "Daily YouTube playlist updater",
+  "main": "update-playlists.js",
+  "scripts": {
+    "update": "node update-playlists.js"
+  },
+  "dependencies": {
+    "node-fetch": "^2.6.9"
+  }
+}
