@@ -2,59 +2,44 @@ name: Update YouTube Playlists Daily
 
 on:
   schedule:
-    # Runs at 2:00 AM UTC every day
     - cron: '0 2 * * *'
-  
-  # Allow manual trigger from GitHub UI
   workflow_dispatch:
-  
-  # Also run when code is pushed (for testing)
   push:
     branches: [ main ]
+
+permissions:
+  contents: write
 
 jobs:
   update-playlists:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: 📥 Checkout repository
-        uses: actions/checkout@v3
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-      
+        uses: actions/checkout@v4
+
       - name: 🔧 Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: '18'
-      
+          node-version: 18
+          cache: 'npm'
+
       - name: 📦 Install dependencies
-        run: |
-          npm init -y
-          npm install node-fetch@2
-      
+        run: npm install node-fetch@2
+
       - name: 🎬 Run playlist update script
         env:
           YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
         run: node update-playlists.js
-      
-      - name: 📊 Check for changes
-        id: git-check
+
+      - name: 💾 Commit and push if changed
         run: |
-          git status --porcelain
-          echo "changed=$(git status --porcelain | wc -l)" >> $GITHUB_OUTPUT
-      
-      - name: ⚙️ Configure Git
-        if: steps.git-check.outputs.changed != '0'
-        run: |
-          git config --global user.name 'GitHub Action'
-          git config --global user.email 'action@github.com'
-      
-      - name: 💾 Commit and push changes
-        if: steps.git-check.outputs.changed != '0'
-        run: |
-          git add playlists.json playlists.min.json playlists-meta.json
-          git commit -m "🔄 Daily playlist update - $(date +'%Y-%m-%d')"
-          git push
-      
-      - name: ✅ Update complete
-        run: echo "✅ Playlists updated successfully!"
+          if [[ -n "$(git status --porcelain)" ]]; then
+            git config user.name "github-actions"
+            git config user.email "github-actions@github.com"
+            git add .
+            git commit -m "🔄 Auto update playlists $(date -u +'%Y-%m-%d')"
+            git push
+          else
+            echo "No changes to commit"
+          fi
