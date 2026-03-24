@@ -3,24 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>InnerTube Search</title>
-    <script src="https://cdn.jsdelivr.net"></script>
+    <title>InnerTube Search (Fixed)</title>
     <style>
-        body { font-family: sans-serif; padding: 20px; text-align: center; }
-        .search-container { margin-bottom: 20px; }
-        input { padding: 10px; width: 300px; }
-        button { padding: 10px 20px; cursor: pointer; }
-        #results { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; }
-        .video-card { border: 1px solid #ddd; padding: 10px; border-radius: 8px; }
-        .video-card img { width: 100%; border-radius: 4px; }
-        .video-card h3 { font-size: 1rem; margin: 10px 0; }
+        body { font-family: -apple-system, sans-serif; padding: 20px; text-align: center; background: #f9f9f9; }
+        .search-container { margin: 20px 0; }
+        input { padding: 12px; width: 300px; border: 1px solid #ccc; border-radius: 4px; }
+        button { padding: 12px 20px; cursor: pointer; background: #ff0000; color: white; border: none; border-radius: 4px; font-weight: bold; }
+        #results { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px; margin-top: 20px; }
+        .video-card { background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.1); padding: 10px; }
+        .video-card img { width: 100%; border-radius: 8px; }
+        .video-card h3 { font-size: 0.9rem; margin: 10px 0; text-align: left; height: 2.4em; overflow: hidden; }
+        a { text-decoration: none; color: black; }
     </style>
 </head>
 <body>
 
-    <h1>YouTube Search (InnerTube)</h1>
+    <h1>YouTube Search</h1>
     <div class="search-container">
-        <input type="text" id="searchInput" placeholder="Search videos (e.g., cat)...">
+        <input type="text" id="searchInput" placeholder="Search cat videos...">
         <button onclick="searchVideos()">Search</button>
     </div>
 
@@ -30,33 +30,49 @@
         async function searchVideos() {
             const query = document.getElementById('searchInput').value;
             const resultsDiv = document.getElementById('results');
-            resultsDiv.innerHTML = "Searching...";
+            if (!query) return;
+
+            resultsDiv.innerHTML = "<p>Loading videos...</p>";
+
+            // We use a public CORS proxy to bypass YouTube's restrictions
+            const proxyUrl = "https://api.allorigins.win";
+            const targetUrl = encodeURIComponent(`https://www.youtube.com{query}&pbj=1`);
 
             try {
-                // Initialize Innertube (Client-side)
-                const innertube = await window.youtubei.Innertube.create();
+                const response = await fetch(proxyUrl + targetUrl);
+                const data = await response.json();
                 
-                // Fetch videos using search query
-                const searchResults = await innertube.search(query);
+                // YouTube returns the page HTML; we extract the video data
+                const html = data.contents;
+                const match = html.match(/ytInitialData = ({.*?});/);
                 
-                resultsDiv.innerHTML = ""; // Clear loader
+                if (!match) throw new Error("Could not parse YouTube data");
+                
+                const ytData = JSON.parse(match[1]);
+                const contents = ytData.contents.twoColumnBrowseResultsRenderer?.tabs[0].content.sectionListRenderer.contents[0].itemSectionRenderer.contents 
+                               || ytData.contents.twoColumnSearchResultsRenderer.primaryContents.sectionListRenderer.contents[0].itemSectionRenderer.contents;
 
-                // Loop through results and display video thumbnails/titles
-                searchResults.videos.forEach(video => {
+                resultsDiv.innerHTML = ""; 
+
+                contents.forEach(item => {
+                    const video = item.videoRenderer;
+                    if (!video) return;
+
                     const card = document.createElement('div');
                     card.className = 'video-card';
                     card.innerHTML = `
-                        <a href="https://www.youtube.com{video.id}" target="_blank">
-                            <img src="${video.thumbnails[0].url}" alt="${video.title}">
-                            <h3>${video.title}</h3>
+                        <a href="https://www.youtube.com{video.videoId}" target="_blank">
+                            <img src="${video.thumbnail.thumbnails[0].url}" alt="${video.title.runs[0].text}">
+                            <h3>${video.title.runs[0].text}</h3>
                         </a>
-                        <p>${video.author?.name || 'Unknown'}</p>
+                        <p style="font-size: 0.8rem; color: #666; text-align: left;">${video.ownerText.runs[0].text}</p>
                     `;
                     resultsDiv.appendChild(card);
                 });
+
             } catch (error) {
-                console.error("Error fetching videos:", error);
-                resultsDiv.innerHTML = "Error loading videos. Check console for details.";
+                console.error(error);
+                resultsDiv.innerHTML = `<p style="color:red">Error: ${error.message}. Try again in a moment.</p>`;
             }
         }
     </script>
