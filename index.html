@@ -3,99 +3,94 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TubeSearch - InnerTube Engine</title>
+    <title>TubeSearch - Fixed Engine</title>
     <style>
-        :root { --yt-red: #ff0000; --bg: #f1f1f1; }
-        body { font-family: Roboto, Arial, sans-serif; background: var(--bg); margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
-        .header { margin-bottom: 30px; text-align: center; }
-        .search-bar { display: flex; width: 100%; max-width: 600px; gap: 8px; }
-        input { flex: 1; padding: 12px 20px; border: 1px solid #ccc; border-radius: 24px; font-size: 16px; outline: none; }
-        button { padding: 10px 25px; background: var(--yt-red); color: white; border: none; border-radius: 24px; cursor: pointer; font-weight: bold; }
-        #results { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; width: 100%; max-width: 1200px; margin-top: 30px; }
-        .card { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); cursor: pointer; transition: 0.2s; }
-        .card:hover { transform: scale(1.02); }
+        :root { --yt-red: #cc0000; --bg: #f9f9f9; }
+        body { font-family: "YouTube Sans", Roboto, Arial, sans-serif; background: var(--bg); margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        .search-container { width: 100%; max-width: 600px; display: flex; gap: 10px; margin-bottom: 30px; }
+        input { flex: 1; padding: 12px 20px; border: 1px solid #ddd; border-radius: 24px; font-size: 16px; outline: none; box-shadow: inset 0 1px 2px rgba(0,0,0,0.1); }
+        button { padding: 12px 24px; background: var(--yt-red); color: white; border: none; border-radius: 24px; cursor: pointer; font-weight: bold; }
+        #results { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; width: 100%; max-width: 1200px; }
+        .card { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05); cursor: pointer; }
         .card img { width: 100%; aspect-ratio: 16/9; object-fit: cover; }
         .info { padding: 12px; }
-        .title { font-size: 14px; font-weight: 500; margin-bottom: 5px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .title { font-size: 14px; font-weight: 600; margin-bottom: 6px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
         .meta { font-size: 12px; color: #606060; }
-        #player-container { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); justify-content: center; align-items: center; z-index: 100; }
-        .player-content { width: 80%; max-width: 800px; aspect-ratio: 16/9; position: relative; }
-        .close-btn { position: absolute; top: -40px; right: 0; color: white; cursor: pointer; font-size: 24px; }
+        .error { color: #cc0000; padding: 20px; text-align: center; }
     </style>
 </head>
 <body>
 
-    <div class="header">
-        <h1>TubeSearch</h1>
-        <div class="search-bar">
-            <input type="text" id="searchInput" placeholder="Search cat videos..." onkeyup="if(event.key==='Enter') search()">
-            <button onclick="search()">Search</button>
-        </div>
+    <div class="search-container">
+        <input type="text" id="searchInput" placeholder="Search (e.g. cat videos)..." onkeyup="if(event.key==='Enter') search()">
+        <button onclick="search()">Search</button>
     </div>
 
     <div id="results"></div>
 
-    <div id="player-container" onclick="closePlayer()">
-        <div class="player-content" onclick="event.stopPropagation()">
-            <span class="close-btn" onclick="closePlayer()">&times; Close</span>
-            <iframe id="videoPlayer" width="100%" height="100%" src="" frameborder="0" allowfullscreen></iframe>
-        </div>
-    </div>
-
     <script>
         async function search() {
-            const query = document.getElementById('searchInput').value;
+            const query = document.getElementById('searchInput').value.trim();
             const resultsDiv = document.getElementById('results');
             if (!query) return;
 
-            resultsDiv.innerHTML = "Loading...";
+            resultsDiv.innerHTML = "<div>Searching YouTube...</div>";
 
-            // Use the AllOrigins proxy to bypass CORS
-            const proxy = "https://api.allorigins.win";
-            const target = encodeURIComponent(`https://www.youtube.com{encodeURIComponent(query)}`);
+            // Using CorsProxy.io as it is currently more stable for YouTube scraping
+            const proxy = "https://corsproxy.io/?";
+            const target = `https://www.youtube.com{encodeURIComponent(query)}`;
 
             try {
-                const response = await fetch(proxy + target);
-                const data = await response.json();
-                const html = data.contents;
+                const response = await fetch(proxy + encodeURIComponent(target));
+                if (!response.ok) throw new Error("Could not connect to proxy.");
+                
+                const html = await response.text();
 
-                // Extract ytInitialData
-                const match = html.match(/ytInitialData = ({.*?});/);
-                if (!match) throw new Error("YouTube changed their data format.");
+                // More robust extraction of ytInitialData
+                const dataRaw = html.split('var ytInitialData = ')[1]?.split(';</script>')[0] || 
+                               html.split('window["ytInitialData"] = ')[1]?.split(';</script>')[0];
+                
+                if (!dataRaw) throw new Error("YouTube updated their security. Please try again in a few minutes.");
 
-                const ytData = JSON.parse(match[1]);
-                const contents = ytData.contents.twoColumnSearchResultsRenderer.primaryContents.sectionListRenderer.contents[0].itemSectionRenderer.contents;
+                const ytData = JSON.parse(dataRaw);
+                
+                // Navigate the complex JSON tree to find video items
+                const sectionList = ytData.contents.twoColumnSearchResultsRenderer.primaryContents.sectionListRenderer.contents;
+                const videoItems = sectionList.find(c => c.itemSectionRenderer)?.itemSectionRenderer.contents || [];
 
                 resultsDiv.innerHTML = "";
-                contents.forEach(item => {
+
+                if (videoItems.length === 0) {
+                    resultsDiv.innerHTML = "No videos found.";
+                    return;
+                }
+
+                videoItems.forEach(item => {
                     const v = item.videoRenderer;
                     if (!v) return;
 
+                    const videoId = v.videoId;
+                    const title = v.title.runs[0].text;
+                    const thumb = v.thumbnail.thumbnails[0].url;
+                    const channel = v.ownerText.runs[0].text;
+
                     const card = document.createElement('div');
                     card.className = 'card';
-                    card.onclick = () => openPlayer(v.videoId);
+                    card.onclick = () => window.open(`https://www.youtube.com{videoId}`, '_blank');
                     card.innerHTML = `
-                        <img src="${v.thumbnail.thumbnails[0].url}">
+                        <img src="${thumb}">
                         <div class="info">
-                            <div class="title">${v.title.runs[0].text}</div>
-                            <div class="meta">${v.ownerText.runs[0].text} • ${v.viewCountText?.simpleText || ''}</div>
+                            <div class="title">${title}</div>
+                            <div class="meta">${channel}</div>
                         </div>
                     `;
                     resultsDiv.appendChild(card);
                 });
+
             } catch (err) {
-                resultsDiv.innerHTML = `<p style="color:red">Error: ${err.message}</p>`;
+                console.error(err);
+                resultsDiv.innerHTML = `<div class="error"><strong>Error:</strong> ${err.message}<br>Try a different search term or check your internet connection.</div>`;
             }
-        }
-
-        function openPlayer(id) {
-            document.getElementById('videoPlayer').src = `https://www.youtube.com{id}?autoplay=1`;
-            document.getElementById('player-container').style.display = 'flex';
-        }
-
-        function closePlayer() {
-            document.getElementById('player-container').style.display = 'none';
-            document.getElementById('videoPlayer').src = "";
         }
     </script>
 </body>
