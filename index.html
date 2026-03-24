@@ -3,176 +3,62 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>YouTube Playlists</title>
+    <title>InnerTube Search</title>
+    <script src="https://cdn.jsdelivr.net"></script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #f9f9f9;
-        }
-        
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        
-        .header {
-            text-align: center;
-            margin-bottom: 40px;
-            padding: 20px;
-        }
-        
-        .header h1 {
-            font-size: 2.5rem;
-            color: #ff0000;
-            margin-bottom: 10px;
-        }
-        
-        .header p {
-            color: #666;
-            font-size: 1.1rem;
-        }
-        
-        .last-updated {
-            text-align: center;
-            color: #888;
-            font-size: 0.9rem;
-            margin-bottom: 30px;
-            padding: 10px;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        
-        .playlist-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 25px;
-            padding: 20px 0;
-        }
-        
-        .playlist-card {
-            background: white;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-            cursor: pointer;
-        }
-        
-        .playlist-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
-        }
-        
-        .thumbnail-container {
-            position: relative;
-            width: 100%;
-            padding-top: 56.25%; /* 16:9 Aspect Ratio */
-            background: #f0f0f0;
-        }
-        
-        .thumbnail {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-        
-        .playlist-info {
-            padding: 15px;
-        }
-        
-        .playlist-title {
-            font-size: 1rem;
-            font-weight: 600;
-            color: #333;
-            margin-bottom: 8px;
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-            line-height: 1.4;
-            height: 2.8em;
-        }
-        
-        .channel-name {
-            font-size: 0.9rem;
-            color: #666;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-        
-        .channel-name::before {
-            content: "📺";
-            font-size: 0.8rem;
-            opacity: 0.7;
-        }
-        
-        .loading {
-            text-align: center;
-            padding: 50px;
-            font-size: 1.2rem;
-            color: #666;
-        }
-        
-        .loading::after {
-            content: "...";
-            animation: dots 1.5s steps(4, end) infinite;
-        }
-        
-        @keyframes dots {
-            0%, 20% { content: "."; }
-            40% { content: ".."; }
-            60%, 100% { content: "..."; }
-        }
-        
-        .error {
-            text-align: center;
-            padding: 50px;
-            color: #ff0000;
-            font-size: 1.1rem;
-        }
-        
-        .footer {
-            text-align: center;
-            margin-top: 50px;
-            padding: 20px;
-            color: #888;
-            font-size: 0.9rem;
-            border-top: 1px solid #eee;
-        }
+        body { font-family: sans-serif; padding: 20px; text-align: center; }
+        .search-container { margin-bottom: 20px; }
+        input { padding: 10px; width: 300px; }
+        button { padding: 10px 20px; cursor: pointer; }
+        #results { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; }
+        .video-card { border: 1px solid #ddd; padding: 10px; border-radius: 8px; }
+        .video-card img { width: 100%; border-radius: 4px; }
+        .video-card h3 { font-size: 1rem; margin: 10px 0; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>🎵 YouTube Playlists</h1>
-            <p>Discover 10 fresh playlists every day</p>
-        </div>
-        
-        <div id="lastUpdated" class="last-updated">
-            Loading playlists...
-        </div>
-        
-        <div id="playlistContainer" class="playlist-grid">
-            <div class="loading">Loading playlists</div>
-        </div>
-        
-        <div class="footer">
-            🔄 Updated daily • Data from YouTube
-        </div>
+
+    <h1>YouTube Search (InnerTube)</h1>
+    <div class="search-container">
+        <input type="text" id="searchInput" placeholder="Search videos (e.g., cat)...">
+        <button onclick="searchVideos()">Search</button>
     </div>
 
-    <script src="script.js"></script>
+    <div id="results"></div>
+
+    <script>
+        async function searchVideos() {
+            const query = document.getElementById('searchInput').value;
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = "Searching...";
+
+            try {
+                // Initialize Innertube (Client-side)
+                const innertube = await window.youtubei.Innertube.create();
+                
+                // Fetch videos using search query
+                const searchResults = await innertube.search(query);
+                
+                resultsDiv.innerHTML = ""; // Clear loader
+
+                // Loop through results and display video thumbnails/titles
+                searchResults.videos.forEach(video => {
+                    const card = document.createElement('div');
+                    card.className = 'video-card';
+                    card.innerHTML = `
+                        <a href="https://www.youtube.com{video.id}" target="_blank">
+                            <img src="${video.thumbnails[0].url}" alt="${video.title}">
+                            <h3>${video.title}</h3>
+                        </a>
+                        <p>${video.author?.name || 'Unknown'}</p>
+                    `;
+                    resultsDiv.appendChild(card);
+                });
+            } catch (error) {
+                console.error("Error fetching videos:", error);
+                resultsDiv.innerHTML = "Error loading videos. Check console for details.";
+            }
+        }
+    </script>
 </body>
 </html>
